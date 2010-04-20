@@ -1,0 +1,4 @@
+; $Id$
+name = Nivo Slider
+description = Provides the jquery nivo slider functionality.
+core = 6.x

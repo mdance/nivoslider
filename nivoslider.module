@@ -1,0 +1,678 @@
+<?php
+// $Id$
+
+/**
+ *  @file
+ *  Provides the jquery nivoslider plugin functionality.
+ */
+
+/**
+ * Implementation of hook_perm().
+ */
+function nivoslider_perm() {
+  return array(
+    'administer nivoslider',
+  );
+}
+
+/**
+ * Implementation of hook_menu().
+ */
+function nivoslider_menu() {
+  $items = array();
+
+  $items['admin/settings/nivoslider'] = array(
+    'title' => 'Nivo Slider',
+    'description' => 'Administer nivo slider settings.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nivoslider_admin_settings'),
+    'access arguments' => array('administer nivoslider'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/settings/nivoslider/settings'] = array(
+    'title' => 'Settings',
+    'description' => 'Administer nivo slider settings.',
+    'access arguments' => array('administer nivoslider'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items['admin/settings/nivoslider/defaults'] = array(
+    'title' => 'Defaults',
+    'description' => 'Administer nivo slider defaults.',
+    'page callback' => 'nivoslider_list',
+    'access arguments' => array('administer nivoslider'),
+    'type' => MENU_LOCAL_TASK,
+  );
+
+  $items['admin/settings/nivoslider/defaults/list'] = array(
+    'title' => 'List',
+    'description' => 'List nivo slider defaults.',
+    'access arguments' => array('administer nivoslider'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+
+  $items['admin/settings/nivoslider/defaults/add'] = array(
+    'title' => 'Add',
+    'description' => 'Add nivo slider defaults.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nivoslider_defaults_form'),
+    'access arguments' => array('administer nivoslider'),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 0,
+  );
+
+  $items['admin/settings/nivoslider/defaults/%nivoslider'] = array(
+    'title' => 'Edit nivoslider Defaults',
+    'description' => 'Edit nivo slider defaults.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nivoslider_defaults_form', 4),
+    'access arguments' => array('administer nivoslider'),
+    'type' => MENU_CALLBACK,
+    'weight' => 0,
+  );
+
+  $items['admin/settings/nivoslider/defaults/%nivoslider/delete'] = array(
+    'title' => 'Delete Nivo Slider Defaults',
+    'description' => 'Delete nivo slider defaults.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('nivoslider_defaults_delete_form', 4),
+    'access arguments' => array('administer nivoslider'),
+    'type' => MENU_CALLBACK,
+    'weight' => 0,
+  );
+
+  return $items;
+}
+
+/**
+ * Loads nivoslider defaults
+ *
+ * This function is called from the menu system.
+ */
+function nivoslider_load($input) {
+  $sql = "SELECT * FROM {nivoslider} WHERE id = %d";
+
+  $result = db_query($sql, $input);
+
+  if ( $result ) {
+    while ( $row = db_fetch_array($result) ) {
+      $row['data'] = unserialize($row['data']);
+
+      return $row;
+    }
+  }
+}
+
+/**
+ * The admin settings form.
+ */
+function nivoslider_admin_settings() {
+  $form['nivoslider_usefooter'] = array(
+    '#type' => 'radios',
+    '#title' => t('Use Footer'),
+    '#options' => array(
+      'true' => t('Yes'),
+      'false' => t('No'),
+    ),
+    '#description' => t('For some themes (like Garland), the nivoslider container must be outputted into the footer section in order to display correctly.'),
+    '#default_value' => nivoslider_usefooter(),
+  );
+
+  return system_settings_form($form);
+}
+
+/**
+ * Lists nivoslider defaults.
+ */
+function nivoslider_list() {
+  $sql = "SELECT id, name FROM {nivoslider}";
+
+  $result = db_query($sql);
+
+  $rows = array();
+
+  if ( $result ) {
+    while ( $record = db_fetch_array($result) ) {
+      $edit = l(t('Edit'), 'admin/settings/nivoslider/defaults/' . $record['id']);
+      $delete = l(t('Delete'), 'admin/settings/nivoslider/defaults/' . $record['id'] . '/delete');
+
+      $row = array(
+        l(check_plain($record['name']), 'admin/settings/nivoslider/defaults/' . $record['id']),
+        $edit . ' | ' . $delete,
+      );
+
+      $rows[] = $row;
+    }
+  }
+
+  if ( count($rows) == 0 ) {
+    $link = l(t('Please click here to add a new default.'), 'admin/settings/nivoslider/defaults/add');
+
+    $output = t('There are no defaults at this time. !link', array('!link' => $link));
+  }
+  else {
+    $headers = array(
+      t('Name'),
+      t('Manage'),
+    );
+
+    $output = theme('table', $headers, $rows);
+  }
+
+  return $output;
+}
+
+/**
+ * Used to add and update defaults.
+ */
+function nivoslider_defaults_form(&$form_state, $record = NULL) {
+  if ( is_null($record) ) {
+    $defaults = array();
+  }
+  else {
+    $defaults = array_merge($record, $record['data']);
+    unset($defaults['data']);
+  }
+
+  $defaults = nivoslider_defaults($defaults);
+
+  $form['name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Name'),
+    '#description' => t('Please enter a name to describe this defaults configuration.'),
+    '#default_value' => $defaults['name'],
+  );
+
+  $form['css'] = array(
+    '#type' => 'textfield',
+    '#title' => t('CSS Class'),
+    '#description' => t('Please enter a css class to be applied to the nivoslider container.  This can be used in your stylesheet to add custom styling for the nivoslider display.'),
+    '#default_value' => $defaults['css'],
+  );
+
+  $form['effect'] = array(
+    '#type' => 'radios',
+    '#title' => t('Effect'),
+    '#description' => t('Please specify which effect transition to use.'),
+    '#options' => array(
+      'sliceDown' => t('sliceDown'),
+      'sliceDownLeft' => t('sliceDownLeft'),
+      'sliceUp' => t('sliceUp'),
+      'sliceUpLeft' => t('sliceUpLeft'),
+      'sliceUpDown' => t('sliceUpDown'),
+      'sliceUpDownLeft' => t('sliceUpDownLeft'),
+      'fold' => t('fold'),
+      'fade' => t('fade'),
+      'random' => t('random'),
+    ),
+    '#default_value' => $defaults['effect'],
+  );
+
+  $form['slices'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Slices'),
+    '#description' => t('Please enter the number of slices for the transition.'),
+    '#default_value' => $defaults['slices'],
+  );
+
+  $form['animSpeed'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Animation Speed'),
+    '#description' => t('Please enter the animation speed.'),
+    '#default_value' => $defaults['animSpeed'],
+  );
+
+  $form['pauseTime'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Pause Time'),
+    '#description' => t('Please enter the pause time.'),
+    '#default_value' => $defaults['pauseTime'],
+  );
+
+  $form['directionNav'] = array(
+    '#type' => 'radios',
+    '#title' => t('Direction Navigation'),
+    '#description' => t('If set to Yes, the nivo slider will display the direction navigation.'),
+    '#options' => array(
+      'true' => t('Yes'),
+      'false' => t('No'),
+    ),
+    '#default_value' => ( $defaults['directionNav'] == 'true' ) ? 'true' : 'false',
+  );
+
+  $form['directionNavHide'] = array(
+    '#type' => 'radios',
+    '#title' => t('Direction Navigation Hide'),
+    '#description' => t('If set to Yes, the direction navigation will only appear when hovered over the slider.'),
+    '#options' => array(
+      'true' => t('Yes'),
+      'false' => t('No'),
+    ),
+    '#default_value' => ( $defaults['directionNavHide'] == 'true' ) ? 'true' : 'false',
+  );
+
+  $form['controlNav'] = array(
+    '#type' => 'radios',
+    '#title' => t('Control Navigation'),
+    '#description' => t('If set to Yes, the nivo slider will display the control navigation (1, 2, 3, 4).'),
+    '#options' => array(
+      'true' => t('Yes'),
+      'false' => t('No'),
+    ),
+    '#default_value' => ( $defaults['controlNav'] == 'true' ) ? 'true' : 'false',
+  );
+
+  $form['keyboardNav'] = array(
+    '#type' => 'radios',
+    '#title' => t('Keyboard Navigation'),
+    '#description' => t('If set to Yes, the nivo slider will allow keyboard navigation.'),
+    '#options' => array(
+      'true' => t('Yes'),
+      'false' => t('No'),
+    ),
+    '#default_value' => ( $defaults['keyboardNav'] == 'true' ) ? 'true' : 'false',
+  );
+
+  $form['pauseOnHover'] = array(
+    '#type' => 'radios',
+    '#title' => t('Pause On Hover'),
+    '#description' => t('If set to Yes, the nivo slider will pause on the hover state.'),
+    '#options' => array(
+      'true' => t('Yes'),
+      'false' => t('No'),
+    ),
+    '#default_value' => ( $defaults['pauseOnHover'] == 'true' ) ? 'true' : 'false',
+  );
+
+  $form['manualAdvance'] = array(
+    '#type' => 'radios',
+    '#title' => t('Manual Advance'),
+    '#description' => t('If set to Yes, the nivo slider will not automatically transition through the images.'),
+    '#options' => array(
+      'true' => t('Yes'),
+      'false' => t('No'),
+    ),
+    '#default_value' => ( $defaults['manualAdvance'] == 'true' ) ? 'true' : 'false',
+  );
+
+  $form['captionOpacity'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Caption Opacity'),
+    '#description' => t('Please enter the caption opacity.'),
+    '#default_value' => $defaults['captionOpacity'],
+  );
+
+  $form['beforeChange'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Before Change Function'),
+    '#description' => t('Please enter the javascript function to call before a transition.'),
+    '#default_value' => $defaults['beforeChange'],
+  );
+
+  $form['afterChange'] = array(
+    '#type' => 'textfield',
+    '#title' => t('After Change Function'),
+    '#description' => t('Please enter the javascript function to call after a transition.'),
+    '#default_value' => $defaults['afterChange'],
+  );
+
+  $form['slideshowEnd'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Slideshow End Function'),
+    '#description' => t('Please enter the javascript function to call when the slideshow ends.'),
+    '#default_value' => $defaults['slideshowEnd'],
+  );
+
+  $form['id'] = array(
+    '#type' => 'value',
+    '#value' => $defaults['id'],
+  );
+
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+
+  return $form;
+}
+
+function nivoslider_defaults_form_submit($form, &$form_state) {
+  $values = $form_state['values'];
+
+  $id = $values['id'];
+  $name = $values['name'];
+
+  unset($values['id'], $values['name'], $values['op'], $values['submit'], $values['form_build_id'], $values['form_token'], $values['form_id']);
+
+  if ( is_null($id) ) {
+    $sql = "INSERT INTO {nivoslider}(name, data) VALUES('%s', '%s')";
+
+    db_query($sql, $name, serialize($values));
+
+    drupal_set_message(t('The nivo slider defaults have been created.'));
+  }
+  else {
+    $sql = "UPDATE {nivoslider} SET name = '%s', data = '%s' WHERE id = %d";
+
+    db_query($sql, $name, serialize($values), $id);
+
+    drupal_set_message(t('The nivo slider defaults have been updated.'));
+  }
+
+  $form_state['redirect'] = 'admin/settings/nivoslider/defaults';
+}
+
+function nivoslider_defaults_delete_form(&$form_state, $record) {
+  $form['info'] = array(
+    '#type' => 'hidden',
+    '#value' => $record['name'],
+  );
+
+  $form['id'] = array(
+    '#type' => 'hidden',
+    '#value' => $record['id'],
+  );
+
+  return confirm_form(
+    $form,
+    t('Are you sure you want to delete the nivo slider defaults?'),
+    'admin/settings/nivoslider/defaults',
+    t('This operation cannot be undone, clicking the Delete button will remove the nivo slider defaults %name permanently.', array('%name' => $record['name'])),
+    t('Delete'),
+    t('Cancel')
+  );
+}
+
+function nivoslider_defaults_delete_form_submit($form, &$form_state) {
+  $sql = "DELETE FROM {nivoslider} WHERE id = %d";
+
+  db_query($sql, $form_state['values']['id']);
+
+  drupal_set_message(t('The nivo slider default %name has been deleted.', array('%name' => $form_state['values']['info'])));
+
+  $form_state['redirect'] = 'admin/settings/nivoslider/defaults';
+}
+
+function nivoslider_usefooter() {
+  $output = variable_get('nivoslider_usefooter', 'true');
+
+  return $output;
+}
+
+/**
+ * Creates a nivo slider container.
+ *
+ * @param $input
+ *   An array of images to display in the nivo slider.
+ *
+ *   Each index can either be a string containing the image URL, or an
+ *   associative containing the following keys:
+ *     - src: the image URL
+ *     - alt: the image ALT attribute
+ *     - title: the image title attribute
+ *     - Any addition keys will be turned into attributes of the image tag
+ * @param $options
+ *   The nivoslider defaults to use, can come in several forms:
+ *   - An integer representing the nivoslider defaults id
+ *   - A string representing the nivoslider defaults name
+ *   - An array of nivoslider defaults, see DEVELOPER.TXT for key values.
+ * @param $sliderid
+ *   An optional string containing the id to use for the slider.
+ */
+function nivoslider_create($input, $options = NULL, $sliderid = NULL) {
+  static $slidercount = 0;
+
+  $output = '';
+
+  $path = drupal_get_path('module', 'nivoslider');
+
+  drupal_add_css($path . '/css/nivoslider.css');
+  drupal_add_css($path . '/css/custom.css');
+
+  drupal_add_js($path . '/js/jquery.nivo.slider.js');
+
+  $defaults = nivoslider_defaults($options);
+
+  if ( is_null($sliderid) ) {
+    $sliderid = 'nivoslider-' . $slidercount;
+    $slidercount++;
+  }
+
+  $usefooter = $defaults['usefooter'];
+
+  $jsdefaults = $defaults;
+
+  $map = array(
+    'effect' => 'string',
+    'slices' => 'int',
+    'animSpeed' => 'int',
+    'pauseTime' => 'int',
+    'directionNav' => 'boolean',
+    'directionNavHide' => 'boolean',
+    'controlNav' => 'boolean',
+    'keyboardNav' => 'boolean',
+    'pauseOnHover' => 'boolean',
+    'manualAdvance' => 'boolean',
+    'captionOpacity' => 'float',
+    'beforeChange' => 'function',
+    'afterChange' => 'function',
+    'slideshowEnd' => 'function',
+  );
+
+  if ( is_array($jsdefaults) ) {
+    foreach ( $jsdefaults as $key => $value ) {
+      if ( !isset($map[$key]) ) {
+        unset($jsdefaults[$key]);
+      }
+      else {
+        switch ( $map[$key] ) {
+          case 'boolean' :
+            if ( $value == 'true' ) {
+              $value = TRUE;
+            }
+            else if ( $value == 'false' ) {
+              $value = FALSE;
+            }
+
+            $jsdefaults[$key] = (boolean)$value;
+            break;
+          case 'int' :
+            $jsdefaults[$key] = (int)$value;
+            break;
+          case 'float' :
+            $jsdefaults[$key] = (float)$value;
+            break;
+          case 'function' :
+            if ( $value == '' ) {
+              unset($jsdefaults[$key]);
+            }
+
+            break;
+        }
+      }
+    }
+  }
+
+  $json = drupal_to_js($jsdefaults);
+
+  $js = <<<EOF
+$(window).load(function(){
+  $('#$sliderid').nivoSlider(
+    $json
+  );
+});
+EOF;
+
+  drupal_add_js($js, 'inline', 'footer');
+
+  $output = theme('nivoslider', $input, $defaults, $sliderid);
+
+  return $output;
+}
+
+/**
+ * Retrieves nivoslider defaults.
+ *
+ * @param $input
+ *   If null, the system defaults will be returned
+ *   If an integer, the system will try to match a defaults id
+ *   If a string, the system will try to match a defaults name
+ *   If an array, the system will override the system defaults,
+ *   with the passed in array.  See DEVELOPER.TXT for valid keys,
+ *   and values.
+ */
+function nivoslider_defaults($input = NULL) {
+  $defaults = array(
+    'name' => t('Defaults'),
+    'css' => 'nivoslider',
+    'effect' => 'random',
+    'slices' => 15,
+    'animSpeed' => 500,
+    'pauseTime' => 3000,
+    'directionNav' => TRUE,
+    'directionNavHide' => TRUE,
+    'controlNav' => TRUE,
+    'keyboardNav' => TRUE,
+    'pauseOnHover' => TRUE,
+    'manualAdvance' => FALSE,
+    'captionOpacity' => 0.8,
+    'beforeChange' => '',
+    'afterChange' => '',
+    'slideshowEnd' => '',
+  );
+
+  if ( !is_null($input) ) {
+    $result = NULL;
+
+    if ( is_numeric($input) ) {
+      $sql = "SELECT data FROM {nivoslider} WHERE id = %d";
+
+      $result = db_query($sql, $input);
+    }
+    else if ( is_string($input) ) {
+      $sql = "SELECT data FROM {nivoslider} WHERE name = '%s'";
+
+      $result = db_query($sql, $input);
+    }
+    else if ( is_array($input) ) {
+      $defaults = array_merge($defaults, $input);
+    }
+
+    if ( !is_null($result) ) {
+      while ( $row = db_fetch_array($result) ) {
+        $defaults = array_merge($defaults, unserialize($row['data']));
+      }
+    }
+  }
+
+  return $defaults;
+}
+
+/**
+ * Returns a options array of nivoslider defaults.
+ */
+function nivoslider_defaultsoptions() {
+  $sql = "SELECT id, name FROM {nivoslider}";
+
+  $result = db_query($sql);
+
+  $output = array();
+
+  if ( $result ) {
+    while ( $row = db_fetch_array($result) ) {
+      $output[$row['id']] = $row['name'];
+    }
+  }
+
+  return $output;
+}
+
+/**
+ *  Implement hook_theme().
+ */
+function nivoslider_theme($existing, $type, $theme, $path) {
+  $theme = array(
+    'nivoslider' =>  array(
+      'arguments' => array(
+        'images' => array(),
+        'defaults' => array(),
+        'sliderid' => array(),
+      ),
+      'template' => 'nivoslider',
+    ),
+  );
+
+  foreach (nivoslider_defaultsoptions() as $id => $name) {
+    $theme['filefield_formatter_nivoslider_formatter_' . $id] = array(
+      'arguments' => array('element' => NULL),
+      'function' => 'nivoslider_formatter',
+    );
+  }
+
+  return $theme;
+}
+
+/**
+ * Implementation of hook_field_formatter_info().
+ */
+function nivoslider_field_formatter_info() {
+  $formatters = array();
+
+  foreach (nivoslider_defaultsoptions() as $id => $name) {
+    $formatters['nivoslider_' . $id] = array(
+      'label' => t('nivoslider @name', array('@name' => $name)),
+      'field types' => array(
+        'image',
+        'filefield',
+      ),
+      'multiple values' => CONTENT_HANDLE_MODULE,
+    );
+  }
+
+  return $formatters;
+}
+
+function nivoslider_formatter($element) {
+  $debug = TRUE;
+
+  if (isset($element['#item']['nid']) && $node = node_load($element['#item']['nid'])) {
+    return nivoslider_field_formatter($element['#field_name'], $element['#item'], $element['#formatter'], $node);
+  }
+}
+
+
+/**
+ * Implementation of hook_field_formatter().
+ */
+function nivoslider_field_formatter($field, $item, $formatter, $node) {
+  $debug = TRUE;
+
+  if (empty($item['fid']) && $field['use_default_image']) {
+    $item = $field['default_image'];
+  }
+
+  // Views does not load the file for us, while CCK display fields does.
+  if (empty($item['filepath'])) {
+    $item = array_merge($item, field_file_load($item['fid']));
+  }
+
+  if (is_string($item['data'])) {
+    $item['data'] = unserialize($item['data']);
+  }
+
+  $sliderid = 'nivoslider-' . $item['fid'];
+  $alt = empty($item['data']['alt']) ? '' : $item['data']['alt'];
+  $title = empty($item['data']['title']) ? '' : $item['data']['title'];
+
+  $parts =  explode('_', $formatter);
+  $defaultid = array_pop($parts);
+
+  if ($defaults = nivoslider_defaults($defaultid)) {
+    $item['filepath'] = $item['fid'] == 'upload' ? $item['preview'] : $item['filepath'];
+
+    return nivoslider_create($images, $defaults, $sliderid);
+  }
+}

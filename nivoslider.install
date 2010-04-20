@@ -1,0 +1,69 @@
+<?php
+// $Id$
+
+/**
+ * Implementation of hook_schema().
+ */
+function nivoslider_schema() {
+  $schema['nivoslider'] = array(
+    'description' => 'Contains nivoslider data',
+    'fields' => array(
+      'id' => array(
+        'description' => 'The primary key',
+        'type' => 'serial',
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => 'A name to identify the settings',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'data' => array(
+        'description' => 'The nivoslider node data',
+        'type' => 'text',
+        'size' => 'big',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('id'),
+  );
+
+  return $schema;
+}
+
+/**
+ * Implementation of hook_install().
+ */
+function nivoslider_install() {
+  drupal_install_schema('nivoslider');
+
+  drupal_set_message(t('The nivoslider module has been installed.'));
+}
+
+/**
+ * Implementation of hook_uninstall().
+ */
+function nivoslider_uninstall() {
+  drupal_uninstall_schema('nivoslider');
+
+  $sql = "DELETE FROM {variable} WHERE name LIKE 'nivoslider_%'";
+
+  db_query($sql);
+
+  drupal_set_message(t('The nivoslider module has been uninstalled.'));
+}
+
+/**
+ * Implementation of hook_enable().
+ */
+function nivoslider_enable() {
+  drupal_set_message(t('The nivoslider module has been enabled.'));
+}
+
+/**
+ * Implementation of hook_disable().
+ */
+function nivoslider_disable() {
+  drupal_set_message(t('The nivoslider module has been disabled.'));
+}
