@@ -17,20 +17,18 @@ if ( $defaults['css'] != '' ) {
   $css = ' class="' . $defaults['css'] . '"';
 }
 
-?>
-<div id="$sliderid"<?php echo $css; ?>>
-  <?php
-
+if ( is_array($images) ) {
   foreach ( $images as $image ) {
     if ( is_array($image) ) {
-      $output .= '<img ' . drupal_attributes($image) . ' />';
+      $imageoutput .= '<img' . drupal_attributes($image) . ' />';
     }
     else {
-      $output .= '<img src="' . check_plain($image) . '" />';
+      $imageoutput .= '<img src="' . check_plain($image) . '" />';
     }
   }
+}
 
-  echo $output;
-
-  ?>
+?>
+<div id="<?php echo $sliderid; ?>"<?php echo $css; ?>>
+  <?php echo $imageoutput; ?>
 </div>

@@ -39,6 +39,10 @@ function nivoslider_install() {
   drupal_install_schema('nivoslider');
 
   drupal_set_message(t('The nivoslider module has been installed.'));
+
+  if ( module_exists('content') ) {
+    content_clear_type_cache();
+  }
 }
 
 /**
@@ -52,6 +56,10 @@ function nivoslider_uninstall() {
   db_query($sql);
 
   drupal_set_message(t('The nivoslider module has been uninstalled.'));
+
+  if ( module_exists('content') ) {
+    content_clear_type_cache();
+  }
 }
 
 /**
@@ -59,6 +67,10 @@ function nivoslider_uninstall() {
  */
 function nivoslider_enable() {
   drupal_set_message(t('The nivoslider module has been enabled.'));
+
+  if ( module_exists('content') ) {
+    content_clear_type_cache();
+  }
 }
 
 /**
@@ -66,4 +78,8 @@ function nivoslider_enable() {
  */
 function nivoslider_disable() {
   drupal_set_message(t('The nivoslider module has been disabled.'));
+
+  if ( module_exists('content') ) {
+    content_clear_type_cache();
+  }
 }

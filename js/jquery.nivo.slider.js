@@ -1,14 +1,13 @@
 /*
- * jQuery Nivo Slider v1.8
+ * jQuery Nivo Slider v1.9
  * http://nivo.dev7studios.com
  *
  * Copyright 2010, Gilbert Pellegrom
  * Free to use and abuse under the MIT license.
  * http://www.opensource.org/licenses/mit-license.php
  * 
- * March 2010
- *
- * manualAdvance option added by HelloPablo (http://hellopablo.co.uk)
+ * April 2010 - controlNavThumbs option added by Jamie Thompson (http://jamiethompson.co.uk)
+ * March 2010 - manualAdvance option added by HelloPablo (http://hellopablo.co.uk)
  */
 
 (function($) {
@@ -63,6 +62,12 @@
 				child.css('display','none');
 				vars.totalSlides++;
 			});
+			
+			//Set startSlide
+			if(settings.startSlide > 0){
+				if(settings.startSlide >= vars.totalSlides) settings.startSlide = vars.totalSlides - 1;
+				vars.currentSlide = settings.startSlide;
+			}
 			
 			//Get initial image
 			if($(kids[vars.currentSlide]).is('img')){
@@ -144,7 +149,16 @@
 				var nivoControl = $('<div class="nivo-controlNav"></div>');
 				slider.append(nivoControl);
 				for(var i = 0; i < kids.length; i++){
-					nivoControl.append('<a class="nivo-control" rel="'+ i +'">'+ (i + 1) +'</a>');
+					if(settings.controlNavThumbs){
+						var child = kids.eq(i);
+						if(!child.is('img')){
+							child = child.find('img:first');
+						}
+						nivoControl.append('<a class="nivo-control" rel="'+ i +'"><img src="'+ child.attr('src').replace(settings.controlNavThumbsSearch, settings.controlNavThumbsReplace) +'"></a>');
+					} else {
+						nivoControl.append('<a class="nivo-control" rel="'+ i +'">'+ i +'</a>');
+					}
+					
 				}
 				//Set initial active link
 				$('.nivo-controlNav a:eq('+ vars.currentSlide +')', slider).addClass('active');
@@ -221,7 +235,7 @@
 		function nivoRun(slider, kids, settings, nudge){
 			//Get our vars
 			var vars = slider.data('nivo:vars');
-			if(vars.stop) return false;
+			if((!vars || vars.stop) && !nudge) return false;
 			
 			//Trigger the beforeChange callback
 			settings.beforeChange.call(this);
@@ -404,9 +418,13 @@
 		slices:15,
 		animSpeed:500,
 		pauseTime:3000,
+		startSlide:0,
 		directionNav:true,
 		directionNavHide:true,
 		controlNav:true,
+		controlNavThumbs:false,
+		controlNavThumbsSearch: '.jpg',
+		controlNavThumbsReplace: '_thumb.jpg',
 		keyboardNav:true,
 		pauseOnHover:true,
 		manualAdvance:false,

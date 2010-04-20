@@ -110,18 +110,7 @@ function nivoslider_load($input) {
  * The admin settings form.
  */
 function nivoslider_admin_settings() {
-  $form['nivoslider_usefooter'] = array(
-    '#type' => 'radios',
-    '#title' => t('Use Footer'),
-    '#options' => array(
-      'true' => t('Yes'),
-      'false' => t('No'),
-    ),
-    '#description' => t('For some themes (like Garland), the nivoslider container must be outputted into the footer section in order to display correctly.'),
-    '#default_value' => nivoslider_usefooter(),
-  );
-
-  return system_settings_form($form);
+  return t('There are no settings at this time.');
 }
 
 /**
@@ -232,6 +221,13 @@ function nivoslider_defaults_form(&$form_state, $record = NULL) {
     '#default_value' => $defaults['pauseTime'],
   );
 
+  $form['startSlide'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Starting Slide'),
+    '#description' => t('Please enter the starting slide (the first slide is 0, the second is 1, etc.).'),
+    '#default_value' => $defaults['startSlide'],
+  );
+
   $form['directionNav'] = array(
     '#type' => 'radios',
     '#title' => t('Direction Navigation'),
@@ -264,6 +260,56 @@ function nivoslider_defaults_form(&$form_state, $record = NULL) {
     ),
     '#default_value' => ( $defaults['controlNav'] == 'true' ) ? 'true' : 'false',
   );
+
+  $form['controlNavThumbs'] = array(
+    '#type' => 'radios',
+    '#title' => t('Thumbnail Control Navigation'),
+    '#description' => t('If set to Yes, the nivo slider will use thumbnails for the control navigation.'),
+    '#options' => array(
+      'true' => t('Yes'),
+      'false' => t('No'),
+    ),
+    '#default_value' => ( $defaults['controlNavThumbs'] == 'true' ) ? 'true' : 'false',
+  );
+
+  $form['controlNavThumbsSearch'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Thumbnail Search String'),
+    '#description' => t('Please enter the thumbnail replace search string.'),
+    '#default_value' => $defaults['controlNavThumbsSearch'],
+  );
+
+  $form['controlNavThumbsReplace'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Thumbnail Search Replace'),
+    '#description' => t('Please enter the thumbnail replacement string.'),
+    '#default_value' => $defaults['controlNavThumbsReplace'],
+  );
+
+  if (module_exists('imagefield') && module_exists('imagecache')) {
+    $options = array();
+
+    foreach (imagecache_presets() as $preset) {
+      $options[$preset['presetname']] = $preset['presetname'];
+    }
+
+    if ( count($options) ) {
+      $form['controlNavThumbsPreset'] = array(
+        '#type' => 'select',
+        '#title' => t('Thumbnail Imagecache Preset'),
+        '#description' => t('Please select the imagecache preset to use for the thumbnail navigation images.'),
+        '#default_value' => $defaults['controlNavThumbsPreset'],
+        '#options' => $options,
+      );
+    }
+  }
+
+  if ( !isset($form['controlNavThumbsPreset']) ) {
+    $form['controlNavThumbsPreset'] = array(
+      '#type' => 'value',
+      '#value' => '',
+    );
+  }
 
   $form['keyboardNav'] = array(
     '#type' => 'radios',
@@ -362,6 +408,10 @@ function nivoslider_defaults_form_submit($form, &$form_state) {
     drupal_set_message(t('The nivo slider defaults have been updated.'));
   }
 
+  if ( module_exists('content') ) {
+    content_clear_type_cache();
+  }
+
   $form_state['redirect'] = 'admin/settings/nivoslider/defaults';
 }
 
@@ -393,13 +443,11 @@ function nivoslider_defaults_delete_form_submit($form, &$form_state) {
 
   drupal_set_message(t('The nivo slider default %name has been deleted.', array('%name' => $form_state['values']['info'])));
 
+  if ( module_exists('content') ) {
+    content_clear_type_cache();
+  }
+
   $form_state['redirect'] = 'admin/settings/nivoslider/defaults';
-}
-
-function nivoslider_usefooter() {
-  $output = variable_get('nivoslider_usefooter', 'true');
-
-  return $output;
 }
 
 /**
@@ -441,8 +489,6 @@ function nivoslider_create($input, $options = NULL, $sliderid = NULL) {
     $slidercount++;
   }
 
-  $usefooter = $defaults['usefooter'];
-
   $jsdefaults = $defaults;
 
   $map = array(
@@ -450,9 +496,13 @@ function nivoslider_create($input, $options = NULL, $sliderid = NULL) {
     'slices' => 'int',
     'animSpeed' => 'int',
     'pauseTime' => 'int',
+    'startSlide' => 'int',
     'directionNav' => 'boolean',
     'directionNavHide' => 'boolean',
     'controlNav' => 'boolean',
+    'controlNavThumbs' => 'boolean',
+    'controlNavThumbsSearch' => 'string',
+    'controlNavThumbsReplace' => 'string',
     'keyboardNav' => 'boolean',
     'pauseOnHover' => 'boolean',
     'manualAdvance' => 'boolean',
@@ -532,9 +582,14 @@ function nivoslider_defaults($input = NULL) {
     'slices' => 15,
     'animSpeed' => 500,
     'pauseTime' => 3000,
+    'startSlide' => 0,
     'directionNav' => TRUE,
     'directionNavHide' => TRUE,
     'controlNav' => TRUE,
+    'controlNavThumbs' => FALSE,
+    'controlNavThumbsSearch' => '.jpg',
+    'controlNavThumbsReplace' => '_thumb.jpg',
+    'controlNavThumbsPreset' => '',
     'keyboardNav' => TRUE,
     'pauseOnHover' => TRUE,
     'manualAdvance' => FALSE,
@@ -548,12 +603,12 @@ function nivoslider_defaults($input = NULL) {
     $result = NULL;
 
     if ( is_numeric($input) ) {
-      $sql = "SELECT data FROM {nivoslider} WHERE id = %d";
+      $sql = "SELECT name, data FROM {nivoslider} WHERE id = %d";
 
       $result = db_query($sql, $input);
     }
     else if ( is_string($input) ) {
-      $sql = "SELECT data FROM {nivoslider} WHERE name = '%s'";
+      $sql = "SELECT name, data FROM {nivoslider} WHERE name = '%s'";
 
       $result = db_query($sql, $input);
     }
@@ -563,6 +618,7 @@ function nivoslider_defaults($input = NULL) {
 
     if ( !is_null($result) ) {
       while ( $row = db_fetch_array($result) ) {
+        $defaults['name'] = $row['name'];
         $defaults = array_merge($defaults, unserialize($row['data']));
       }
     }
@@ -606,10 +662,19 @@ function nivoslider_theme($existing, $type, $theme, $path) {
   );
 
   foreach (nivoslider_defaultsoptions() as $id => $name) {
-    $theme['filefield_formatter_nivoslider_formatter_' . $id] = array(
+    $theme['nivoslider_formatter_defaults_' . $id] = array(
       'arguments' => array('element' => NULL),
       'function' => 'nivoslider_formatter',
     );
+
+    if (module_exists('imagefield') && module_exists('imagecache')) {
+      foreach (imagecache_presets() as $preset) {
+        $theme['nivoslider_formatter_defaults_' . $id . '_' . $preset['presetname']] = array(
+          'arguments' => array('element' => NULL),
+          'function' => 'nivoslider_formatter',
+        );
+      }
+    }
   }
 
   return $theme;
@@ -622,7 +687,7 @@ function nivoslider_field_formatter_info() {
   $formatters = array();
 
   foreach (nivoslider_defaultsoptions() as $id => $name) {
-    $formatters['nivoslider_' . $id] = array(
+    $formatters['defaults_' . $id] = array(
       'label' => t('nivoslider @name', array('@name' => $name)),
       'field types' => array(
         'image',
@@ -630,49 +695,76 @@ function nivoslider_field_formatter_info() {
       ),
       'multiple values' => CONTENT_HANDLE_MODULE,
     );
+
+    if (module_exists('imagefield') && module_exists('imagecache')) {
+      foreach (imagecache_presets() as $preset) {
+        $formatters['defaults_' . $id . '_' . $preset['presetname']] = array(
+          'label' => t('nivoslider @name: @preset image', array('@name' => $name, '@preset' => $preset['presetname'])),
+          'field types' => array(
+            'image',
+            'filefield'
+          ),
+          'multiple values' => CONTENT_HANDLE_MODULE,
+        );
+      }
+    }
   }
 
   return $formatters;
 }
 
 function nivoslider_formatter($element) {
-  $debug = TRUE;
+  $parts =  explode('_', $element['#formatter']);
 
-  if (isset($element['#item']['nid']) && $node = node_load($element['#item']['nid'])) {
-    return nivoslider_field_formatter($element['#field_name'], $element['#item'], $element['#formatter'], $node);
+  if ( count($parts) > 2 ) {
+    $preset = array_pop($parts);
   }
-}
-
-
-/**
- * Implementation of hook_field_formatter().
- */
-function nivoslider_field_formatter($field, $item, $formatter, $node) {
-  $debug = TRUE;
-
-  if (empty($item['fid']) && $field['use_default_image']) {
-    $item = $field['default_image'];
+  else {
+    $preset = '';
   }
 
-  // Views does not load the file for us, while CCK display fields does.
-  if (empty($item['filepath'])) {
-    $item = array_merge($item, field_file_load($item['fid']));
-  }
-
-  if (is_string($item['data'])) {
-    $item['data'] = unserialize($item['data']);
-  }
-
-  $sliderid = 'nivoslider-' . $item['fid'];
-  $alt = empty($item['data']['alt']) ? '' : $item['data']['alt'];
-  $title = empty($item['data']['title']) ? '' : $item['data']['title'];
-
-  $parts =  explode('_', $formatter);
   $defaultid = array_pop($parts);
 
-  if ($defaults = nivoslider_defaults($defaultid)) {
-    $item['filepath'] = $item['fid'] == 'upload' ? $item['preview'] : $item['filepath'];
+  $images = array();
 
-    return nivoslider_create($images, $defaults, $sliderid);
+  foreach ( $element as $key => $item ) {
+    if ( element_child($key) ) {
+      if (empty($item['#item']['fid']) && $field['use_default_image']) {
+        $item = $field['default_image'];
+      }
+
+      // Views does not load the file for us, while CCK display fields does.
+      if (empty($item['#item']['filepath'])) {
+        $item['#item'] = array_merge($item['#item'], field_file_load($item['#item']['fid']));
+      }
+
+      if (is_string($item['#item']['data'])) {
+        $item['#item']['data'] = unserialize($item['#item']['data']);
+      }
+
+      $alt = empty($item['#item']['data']['alt']) ? '' : $item['#item']['data']['alt'];
+      $title = empty($item['#item']['data']['title']) ? '' : $item['#item']['data']['title'];
+
+      $filepath = $item['fid'] == 'upload' ? $item['#item']['preview'] : $item['#item']['filepath'];
+
+      if ( module_exists('imagecache') ) {
+        $filepath = imagecache_create_url($preset, $filepath);
+      }
+      else {
+        $filepath = '/' . $filepath;
+      }
+
+      $images[] = array(
+        'alt' => $alt,
+        'title' => $title,
+        'src' => $filepath,
+      );
+    }
+  }
+
+  if ( count($images) > 0 ) {
+    $sliderid = 'nivoslider-node-' . $element['#node']->vid;
+
+    return nivoslider_create($images, $defaultid, $sliderid);
   }
 }
