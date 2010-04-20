@@ -489,14 +489,16 @@ function nivoslider_create($input, $options = NULL, $sliderid = NULL) {
   $defaults = nivoslider_defaults($options);
 
   if ( is_array($input) ) {
-    foreach($input as $image) {
+    for ( $count = 0; $count < count($input); $count++ ) {
+      $image = $input[$count];
+      
       if ( is_array($image) ) {
         if ( $defaults['controlNavThumbs'] && isset($defaults['controlNavThumbsPreset']) && $defaults['controlNavThumbsPreset'] != '' && module_exists('imagecache') ) {
           $defaults['controlNavThumbsIndex'][] = imagecache_create_url($defaults['controlNavThumbsPreset'], $image['filepath']);
-
-          unset($image['filepath'], $image['preset']);
         }
       }
+      
+      unset($input[$count]['preset'], $input[$count]['filepath']);
     }
   }
 
