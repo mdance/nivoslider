@@ -6,6 +6,15 @@ Created By
 Michael Dance [michael.dance@gmail.com]
 April 9, 2010
 
+Important
+-----------
+
+This module requires a jquery version > 1.3
+
+This is available with the jquery_update v 6.2
+
+See http://drupal.org/project/jquery_update
+
 Description
 -----------
 
