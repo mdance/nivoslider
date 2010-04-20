@@ -154,7 +154,16 @@
 						if(!child.is('img')){
 							child = child.find('img:first');
 						}
-						nivoControl.append('<a class="nivo-control" rel="'+ i +'"><img src="'+ child.attr('src').replace(settings.controlNavThumbsSearch, settings.controlNavThumbsReplace) +'"></a>');
+						
+						var src = '';
+						
+						if ( settings.controlNavThumbsIndex.length > 0 ) {
+						  src = settings.controlNavThumbsIndex[i];
+						} else {
+						  src = child.attr('src').replace(settings.controlNavThumbsSearch, settings.controlNavThumbsReplace);
+						}
+						
+						nivoControl.append('<a class="nivo-control" rel="'+ i +'"><img src="'+ src +'"></a>');
 					} else {
 						nivoControl.append('<a class="nivo-control" rel="'+ i +'">'+ i +'</a>');
 					}
@@ -425,6 +434,7 @@
 		controlNavThumbs:false,
 		controlNavThumbsSearch: '.jpg',
 		controlNavThumbsReplace: '_thumb.jpg',
+		controlNavThumbsIndex: {},
 		keyboardNav:true,
 		pauseOnHover:true,
 		manualAdvance:false,

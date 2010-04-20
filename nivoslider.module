@@ -277,19 +277,21 @@ function nivoslider_defaults_form(&$form_state, $record = NULL) {
   $form['controlNavThumbsSearch'] = array(
     '#type' => 'textfield',
     '#title' => t('Thumbnail Search String'),
-    '#description' => t('Please enter the thumbnail replace search string.'),
+    '#description' => t('Please enter the thumbnail search string.  For example: if the image was named image.jpg and the thumbnail was image_thumb.jpg, .jpg would be the search string (which will be replaced with the Thumbnail Search Replace specified below).  If you have imagecache enabled and select a preset below, this field will be ignored.'),
     '#default_value' => $defaults['controlNavThumbsSearch'],
   );
 
   $form['controlNavThumbsReplace'] = array(
     '#type' => 'textfield',
     '#title' => t('Thumbnail Search Replace'),
-    '#description' => t('Please enter the thumbnail replacement string.'),
+    '#description' => t('Please enter the thumbnail replacement string.  For example: if the image was named image.jpg and the thumbnail was image_thumb.jpg, _thumb.jpg would be the replacement string.  If you have imagecache enabled and select a preset below, this field will be ignored.'),
     '#default_value' => $defaults['controlNavThumbsReplace'],
   );
 
   if (module_exists('imagefield') && module_exists('imagecache')) {
-    $options = array();
+    $options = array(
+      '' => t('None'),
+    );
 
     foreach (imagecache_presets() as $preset) {
       $options[$preset['presetname']] = $preset['presetname'];
@@ -486,6 +488,18 @@ function nivoslider_create($input, $options = NULL, $sliderid = NULL) {
 
   $defaults = nivoslider_defaults($options);
 
+  if ( is_array($input) ) {
+    foreach($input as $image) {
+      if ( is_array($image) ) {
+        if ( $defaults['controlNavThumbs'] && isset($defaults['controlNavThumbsPreset']) && $defaults['controlNavThumbsPreset'] != '' && module_exists('imagecache') ) {
+          $defaults['controlNavThumbsIndex'][] = imagecache_create_url($defaults['controlNavThumbsPreset'], $image['filepath']);
+
+          unset($image['filepath'], $image['preset']);
+        }
+      }
+    }
+  }
+
   if ( is_null($sliderid) ) {
     $sliderid = 'nivoslider-' . $slidercount;
     $slidercount++;
@@ -505,6 +519,7 @@ function nivoslider_create($input, $options = NULL, $sliderid = NULL) {
     'controlNavThumbs' => 'boolean',
     'controlNavThumbsSearch' => 'string',
     'controlNavThumbsReplace' => 'string',
+    'controlNavThumbsIndex' => 'array',
     'keyboardNav' => 'boolean',
     'pauseOnHover' => 'boolean',
     'manualAdvance' => 'boolean',
@@ -536,6 +551,9 @@ function nivoslider_create($input, $options = NULL, $sliderid = NULL) {
             break;
           case 'float' :
             $jsdefaults[$key] = (float)$value;
+            break;
+          case 'array' :
+            $jsdefaults[$key] = (array)$value;
             break;
           case 'function' :
             if ( $value == '' ) {
@@ -592,6 +610,7 @@ function nivoslider_defaults($input = NULL) {
     'controlNavThumbsSearch' => '.jpg',
     'controlNavThumbsReplace' => '_thumb.jpg',
     'controlNavThumbsPreset' => '',
+    'controlNavThumbsIndex' => array(),
     'keyboardNav' => TRUE,
     'pauseOnHover' => TRUE,
     'manualAdvance' => FALSE,
@@ -749,17 +768,19 @@ function nivoslider_formatter($element) {
 
       $filepath = $item['fid'] == 'upload' ? $item['#item']['preview'] : $item['#item']['filepath'];
 
-      if ( module_exists('imagecache') ) {
-        $filepath = imagecache_create_url($preset, $filepath);
+      if ( module_exists('imagecache') && $preset != '' ) {
+        $src = imagecache_create_url($preset, $filepath);
       }
       else {
-        $filepath = '/' . $filepath;
+        $src = '/' . $filepath;
       }
 
       $images[] = array(
         'alt' => $alt,
         'title' => $title,
-        'src' => $filepath,
+        'src' => $src,
+        'preset' => $preset,
+        'filepath' => $filepath,
       );
     }
   }
