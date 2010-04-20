@@ -110,7 +110,9 @@ function nivoslider_load($input) {
  * The admin settings form.
  */
 function nivoslider_admin_settings() {
-  return t('There are no settings at this time.');
+  $form['#prefix'] = t('There are no settings at this time.');
+
+  return $form;
 }
 
 /**
